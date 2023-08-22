@@ -4,4 +4,4 @@
 - Write something here.
 - Make VPNC_SCRIPT and HIP_REPORT optional
 - add cmdline parameters: connect (optional, default) | disconnect
-
+- distinguish between macos (osascript) and linux (manual auth)
