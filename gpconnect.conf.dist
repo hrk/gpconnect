@@ -1,0 +1,8 @@
+# Configuration file for gpconnect.sh
+GP_USER=
+GP_SERVER=
+GP_GATEWAY=
+GP_OS=
+
+VPNC_SCRIPT=
+HIP_REPORT=
