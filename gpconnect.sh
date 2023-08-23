@@ -25,7 +25,7 @@ else
 fi
 
 
-function connect() {
+function read_config() {
     # Read configuration from file and perform some validation checks.
     CONF=/etc/gpconnect.conf
 
@@ -36,6 +36,11 @@ function connect() {
     if [[ -z "${GP_SERVER}" || -z "${GP_GATEWAY}" ]]; then
         echo -e "Please check that both GP_SERVER and GP_GATEWAY are properly configured in ${CONF}".
     fi;
+}
+
+function connect() {
+
+    read_config
 
     case "$OSTYPE" in
     darwin*)   GP_PRELOGIN_MODE=automatic ;;
@@ -83,15 +88,15 @@ function connect() {
         open -u ${LOGIN}
         
         GP_PRELOGIN_COOKIE=$((
-        osascript <<'END'
-            tell application "Safari"
-                activate
-                set my_html to source of document 1
-                close current tab of front window without saving
-            end tell
-            return my_html
-            end run
-    END
+            osascript <<'END'
+                tell application "Safari"
+                    activate
+                    set my_html to source of document 1
+                    close current tab of front window without saving
+                end tell
+                return my_html
+                end run
+            END
         ) | ggrep -oE 'cookie>(.*)</prelogin' | cut -c8- | rev | cut -c11- | rev)
 
         read -p "Press 'enter' to confirm that your browser displayed a 'Login Successful' message."
@@ -103,9 +108,9 @@ function connect() {
 }
 
 function disconnect () {
-    sudo pkill -SIGINT openconnect && echo "Disconnected" || echo "Could not terminate the tunnel."
+    read_config
+    sudo pkill -SIGINT -f "${GP_SERVER}" && echo "Disconnected" || echo "Could not terminate the tunnel."
 }
-
 
 if [ "$action" = "connect" ]; then
     connect
