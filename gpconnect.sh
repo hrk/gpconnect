@@ -32,7 +32,7 @@ GP_USER=${GP_USER,,}
 
 RESPONSE=$(openconnect --protocol=gp "${GP_SERVER}" --user="${GP_USER}" 2>/dev/null)
 
-LOGIN=$(echo "${RESPONSE}" | grep -oP 'via (.*SAMLRequest.*)' | cut -c 4- | xargs)
+LOGIN=$(echo "${RESPONSE}" | grep -oE 'via (.*SAMLRequest.*)' | cut -c 4- | xargs)
 
 echo -e "Connect to the following URL:\n${LOGIN}\nand, when the authentication is complete, copy the resulting HTML."
 
@@ -50,7 +50,7 @@ echo -e "Connect to the following URL:\n${LOGIN}\nand, when the authentication i
 read -p "Paste full HTML or pre-login cookie: " GP_PRELOGIN_COOKIE
 
 if [[ "${GP_PRELOGIN_COOKIE}" =~ "cookie>" ]]; then
-	GP_PRELOGIN_COOKIE=$(echo -e "$GP_PRELOGIN_COOKIE" | grep -oP 'cookie>(.*)</prelogin' | cut -c8- | rev | cut -c11- | rev)
+	GP_PRELOGIN_COOKIE=$(echo -e "$GP_PRELOGIN_COOKIE" | grep -oE 'cookie>(.*)</prelogin' | cut -c8- | rev | cut -c11- | rev)
 	echo -e "Detected HTML fragment, Cookie value: ${GP_PRELOGIN_COOKIE}"
 fi;
 
