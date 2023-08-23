@@ -15,12 +15,12 @@ fi;
 # Start connection process.
 GP_OS="${GP_OS:-win}"
 
-if [[ ! -z "${HIP_REPORT}" ]]; then
-	GP_WRAPPER='--csd-wrapper="${HIP_REPORT}"'
-fi;
-if [[ ! -z "${VPNC_SCRIPT}" ]]; then
-	GP_SCRIPT='--script="${VPNC_SCRIPT}"'
-fi;
+#if [[ ! -z "${HIP_REPORT}" ]]; then
+#	GP_WRAPPER="--csd-wrapper=${HIP_REPORT}"
+#fi;
+#if [[ ! -z "${VPNC_SCRIPT}" ]]; then
+#	GP_SCRIPT="--script=${VPNC_SCRIPT}"
+#fi;
 
 # If user is unset, read it from stdin...
 if [[ -z "${GP_USER}" ]]; then
@@ -56,4 +56,4 @@ fi;
 
 echo -e "When asked, enter your sudo password.\n"
 
-echo "${GP_PRELOGIN_COOKIE}" | sudo openconnect --protocol=gp --user="${GP_USER}" --os=win --authgroup="${GP_GATEWAY}" --usergroup=portal:prelogin-cookie ${GP_WRAPPER} --passwd-on-stdin ${GP_SCRIPT} ${GP_SERVER} --background
+echo "${GP_PRELOGIN_COOKIE}" | sudo openconnect --protocol=gp --user="${GP_USER}" --os=win --authgroup="${GP_GATEWAY}" --usergroup=portal:prelogin-cookie --csd-wrapper="${HIP_REPORT}" --passwd-on-stdin --script="${VPNC_SCRIPT}" "${GP_SERVER}" --background
