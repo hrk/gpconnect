@@ -1,76 +1,117 @@
 #! /usr/bin/env bash
 
-# Read configuration from file and perform some validation checks.
-CONF=/etc/gpconnect.conf
-
-if [[ -f "${CONF}" ]]; then
-    source "${CONF}";
-fi;
-
-if [[ -z "${GP_SERVER}" || -z "${GP_GATEWAY}" ]]; then
-    echo -e "Please check that both GP_SERVER and GP_GATEWAY are properly configured in ${CONF}".
-fi;
-
-case "$OSTYPE" in
-  darwin*)   GP_PRELOGIN_MODE=automatic ;;
-  *)         GP_PRELOGIN_MODE=manual ;;
-esac
-
-# Start connection process.
-GP_OS="${GP_OS:-win}"
-
-if [[ ! -z "${HIP_REPORT}" ]]; then
-  GP_WRAPPER="--csd-wrapper=${HIP_REPORT}"
-fi;
-if [[ ! -z "${VPNC_SCRIPT}" ]]; then
-  GP_SCRIPT="--script=${VPNC_SCRIPT}"
-fi;
-
-# If user is unset, read it from stdin...
-if [[ -z "${GP_USER}" ]]; then
-    read -p "Username: " GP_USER
-fi;
-
-# ... then make sure it's lowercase:
-GP_USER=${GP_USER,,}
-
-RESPONSE=$(openconnect --protocol=gp "${GP_SERVER}" --user="${GP_USER}" 2>/dev/null)
-
-if [[ -z "${RESPONSE}" ]]; then
-        echo "Prelogin failed. Please check your configuration before trying again."
-        exit 1
-fi;
-
-LOGIN=$(echo "${RESPONSE}" | grep -oE 'via (.*SAMLRequest.*)' | cut -c 4- | xargs)
-
-if [[ ${GP_PRELOGIN_MODE} = "manual" ]]; then
-    echo -e "Connect to the following URL:\n${LOGIN}\nand, when the authentication is complete, copy the resulting HTML."
-    read -p "Paste full HTML or pre-login cookie: " GP_PRELOGIN_COOKIE
-    
-    if [[ "${GP_PRELOGIN_COOKIE}" =~ "cookie>" ]]; then
-        GP_PRELOGIN_COOKIE=$(echo -e "$GP_PRELOGIN_COOKIE" | grep -oE 'cookie>(.*)</prelogin' | cut -c8- | rev | cut -c11- | rev)
-        echo -e "Detected HTML fragment, Cookie value: ${GP_PRELOGIN_COOKIE}"
-    fi;
-elif [[ ${GP_PRELOGIN_MODE} = "automatic" ]]; then
-    echo -e "A new browser window will now be opened automatically. If you don't have an open session you will have to authenticate manually: once you're done, please return to this window."
-    read -p "Press 'enter' to continue."
-    open -u ${LOGIN}
-    
-    GP_PRELOGIN_COOKIE=$((
-    osascript <<'END'
-        tell application "Safari"
-            activate
-            set my_html to source of document 1
-            close current tab of front window without saving
-        end tell
-        return my_html
-        end run
-END
-    ) | ggrep -oE 'cookie>(.*)</prelogin' | cut -c8- | rev | cut -c11- | rev)
-
-    read -p "Press 'enter' to confirm that your browser displayed a 'Login Successful' message."
+# Check that no more than one argument is passed
+if [ $# -eq 1 ]; then
+    # Check the first argument
+    case "$1" in
+        -c)
+            action="connect";;
+        --connect)
+            action="connect";;
+        -d)
+            action="disconnect";;
+        --disconnect)
+            action="disconnect";;
+        *)
+            echo "Error: Invalid argument."
+            exit 1;;
+    esac
+elif [ $# -eq 0 ]; then
+    # Set default value
+    action="connect"
+else
+    echo "Error: This script takes at most one argument (-c / --connect, which is the default, or -d / --disconnect)."
+    exit 1
 fi
 
-echo -e "When asked, enter your sudo password.\n"
 
-echo "${GP_PRELOGIN_COOKIE}" | sudo openconnect --passwd-on-stdin --background --quiet "${GP_SERVER}" --protocol=gp --user="${GP_USER}" --os="${GP_OS}" --authgroup="${GP_GATEWAY}" --usergroup=portal:prelogin-cookie "${GP_WRAPPER}" "${GP_SCRIPT}"
+function connect() {
+    # Read configuration from file and perform some validation checks.
+    CONF=/etc/gpconnect.conf
+
+    if [[ -f "${CONF}" ]]; then
+        source "${CONF}";
+    fi;
+
+    if [[ -z "${GP_SERVER}" || -z "${GP_GATEWAY}" ]]; then
+        echo -e "Please check that both GP_SERVER and GP_GATEWAY are properly configured in ${CONF}".
+    fi;
+
+    case "$OSTYPE" in
+    darwin*)   GP_PRELOGIN_MODE=automatic ;;
+    *)         GP_PRELOGIN_MODE=manual ;;
+    esac
+
+    # Start connection process.
+    GP_OS="${GP_OS:-win}"
+
+    if [[ ! -z "${HIP_REPORT}" ]]; then
+    GP_WRAPPER="--csd-wrapper=${HIP_REPORT}"
+    fi;
+    if [[ ! -z "${VPNC_SCRIPT}" ]]; then
+    GP_SCRIPT="--script=${VPNC_SCRIPT}"
+    fi;
+
+    # If user is unset, read it from stdin...
+    if [[ -z "${GP_USER}" ]]; then
+        read -p "Username: " GP_USER
+    fi;
+
+    # ... then make sure it's lowercase:
+    GP_USER=${GP_USER,,}
+
+    RESPONSE=$(openconnect --protocol=gp "${GP_SERVER}" --user="${GP_USER}" 2>/dev/null)
+
+    if [[ -z "${RESPONSE}" ]]; then
+            echo "Prelogin failed. Please check your configuration before trying again."
+            exit 1
+    fi;
+
+    LOGIN=$(echo "${RESPONSE}" | grep -oE 'via (.*SAMLRequest.*)' | cut -c 4- | xargs)
+
+    if [[ ${GP_PRELOGIN_MODE} = "manual" ]]; then
+        echo -e "Connect to the following URL:\n${LOGIN}\nand, when the authentication is complete, copy the resulting HTML."
+        read -p "Paste full HTML or pre-login cookie: " GP_PRELOGIN_COOKIE
+        
+        if [[ "${GP_PRELOGIN_COOKIE}" =~ "cookie>" ]]; then
+            GP_PRELOGIN_COOKIE=$(echo -e "$GP_PRELOGIN_COOKIE" | grep -oE 'cookie>(.*)</prelogin' | cut -c8- | rev | cut -c11- | rev)
+            echo -e "Detected HTML fragment, Cookie value: ${GP_PRELOGIN_COOKIE}"
+        fi;
+    elif [[ ${GP_PRELOGIN_MODE} = "automatic" ]]; then
+        echo -e "A new browser window will now be opened automatically. If you don't have an open session you will have to authenticate manually: once you're done, please return to this window."
+        read -p "Press 'enter' to continue."
+        open -u ${LOGIN}
+        
+        GP_PRELOGIN_COOKIE=$((
+        osascript <<'END'
+            tell application "Safari"
+                activate
+                set my_html to source of document 1
+                close current tab of front window without saving
+            end tell
+            return my_html
+            end run
+    END
+        ) | ggrep -oE 'cookie>(.*)</prelogin' | cut -c8- | rev | cut -c11- | rev)
+
+        read -p "Press 'enter' to confirm that your browser displayed a 'Login Successful' message."
+    fi
+
+    echo -e "When asked, enter your sudo password.\n"
+
+    echo "${GP_PRELOGIN_COOKIE}" | sudo openconnect --passwd-on-stdin --background --quiet "${GP_SERVER}" --protocol=gp --user="${GP_USER}" --os="${GP_OS}" --authgroup="${GP_GATEWAY}" --usergroup=portal:prelogin-cookie "${GP_WRAPPER}" "${GP_SCRIPT}"
+}
+
+function disconnect () {
+    sudo pkill -SIGINT openconnect && echo "Disconnected" || echo "Could not terminate the tunnel."
+}
+
+
+if [ "$action" = "connect" ]; then
+    connect
+elif  [ "$action" = "disconnect" ]; then
+    disconnect
+else 
+    echo "Action not implemented"
+    exit 1;
+fi

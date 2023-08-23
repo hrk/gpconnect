@@ -16,9 +16,8 @@
 
 
 ### Usage examples
-- how to connect
-- how to disconnect
+- You can connect by simply calling the script, or optionally by passing the -c / --connect argument
+- You can disconnect by passing the -d / --disconnect argument
 
 # TODO
 - Write something here.
-- add cmdline parameters: connect (optional, default) | disconnect
