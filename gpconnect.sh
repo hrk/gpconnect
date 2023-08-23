@@ -53,21 +53,22 @@ if [[ ${GP_PRELOGIN_MODE} = "manual" ]]; then
     fi;
 elif [[ ${GP_PRELOGIN_MODE} = "automatic" ]]; then
     echo -e "A new browser window will now be opened automatically. If you don't have an open session you will have to authenticate manually: once you're done, please return to this window."
-    read -p "Press 'enter' to continue"
+    read -p "Press 'enter' to continue."
     open -u ${LOGIN}
-    read -p "Press 'enter' to continue"
     
     GP_PRELOGIN_COOKIE=$((
-osascript <<'END'
-tell application "Safari"
-    activate
-    set my_html to source of document 1
-    close current tab of front window without saving
-end tell
-return my_html
-end run
+    osascript <<'END'
+        tell application "Safari"
+            activate
+            set my_html to source of document 1
+            close current tab of front window without saving
+        end tell
+        return my_html
+        end run
 END
     ) | ggrep -oE 'cookie>(.*)</prelogin' | cut -c8- | rev | cut -c11- | rev)
+
+    read -p "Press 'enter' to confirm that your browser displayed a 'Login Successful' message."
 fi
 
 echo -e "When asked, enter your sudo password.\n"
