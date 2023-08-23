@@ -32,6 +32,11 @@ GP_USER=${GP_USER,,}
 
 RESPONSE=$(openconnect --protocol=gp "${GP_SERVER}" --user="${GP_USER}" 2>/dev/null)
 
+if [[ -z "${RESPONSE}" ]]; then
+        echo "Prelogin failed. Please check your configuration before trying again."
+        exit 1
+fi;
+
 LOGIN=$(echo "${RESPONSE}" | grep -oE 'via (.*SAMLRequest.*)' | cut -c 4- | xargs)
 
 echo -e "Connect to the following URL:\n${LOGIN}\nand, when the authentication is complete, copy the resulting HTML."
