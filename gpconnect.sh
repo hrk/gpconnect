@@ -56,4 +56,4 @@ fi;
 
 echo -e "When asked, enter your sudo password.\n"
 
-echo "${GP_PRELOGIN_COOKIE}" | sudo openconnect --protocol=gp --user="${GP_USER}" --os=win --authgroup="${GP_GATEWAY}" --usergroup=portal:prelogin-cookie --csd-wrapper="${HIP_REPORT}" --passwd-on-stdin --script="${VPNC_SCRIPT}" "${GP_SERVER}" --background
+echo "${GP_PRELOGIN_COOKIE}" | sudo openconnect --protocol=gp --user="${GP_USER}" --os=win --authgroup="${GP_GATEWAY}" --usergroup=portal:prelogin-cookie --csd-wrapper="${HIP_REPORT}" --passwd-on-stdin --script="${VPNC_SCRIPT}" "${GP_SERVER}" --background --quiet
