@@ -40,8 +40,6 @@ function read_config() {
 
 function connect() {
 
-    read_config
-
     case "$OSTYPE" in
     darwin*)   GP_PRELOGIN_MODE=automatic ;;
     *)         GP_PRELOGIN_MODE=manual ;;
@@ -108,12 +106,17 @@ function connect() {
 }
 
 function disconnect () {
-    read_config
     sudo pkill -SIGINT -f "${GP_SERVER}" && echo "Disconnected" || echo "Could not terminate the tunnel."
 }
 
+read_config
 if [ "$action" = "connect" ]; then
-    connect
+    if ! pgrep -f "${GP_SERVER}" >/dev/null; then
+        connect
+    else
+        echo "There seems to be another open tunnel to the same server, aborting."
+        exit 1
+    fi
 elif  [ "$action" = "disconnect" ]; then
     disconnect
 else 
