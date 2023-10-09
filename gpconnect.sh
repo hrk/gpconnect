@@ -24,6 +24,9 @@ else
     exit 1
 fi
 
+function parse_prelogin_html () {
+    echo -e "${1}" | grep -oE 'cookie>(.*)</prelogin' | cut -c8- | rev | cut -c11- | rev
+}
 
 function read_config() {
     # Read configuration from file and perform some validation checks.
@@ -77,7 +80,7 @@ function connect() {
         read -p "Paste full HTML or pre-login cookie: " GP_PRELOGIN_COOKIE
         
         if [[ "${GP_PRELOGIN_COOKIE}" =~ "cookie>" ]]; then
-            GP_PRELOGIN_COOKIE=$(echo -e "$GP_PRELOGIN_COOKIE" | grep -oE 'cookie>(.*)</prelogin' | cut -c8- | rev | cut -c11- | rev)
+            GP_PRELOGIN_COOKIE=$(parse_prelogin_html ${GP_PRELOGIN_COOKIE})
             echo -e "Detected HTML fragment, Cookie value: ${GP_PRELOGIN_COOKIE}"
         fi;
     elif [[ ${GP_PRELOGIN_MODE} = "automatic" ]]; then
@@ -85,19 +88,19 @@ function connect() {
         read -p "Press 'enter' to continue."
         open -u ${LOGIN}
         
-        GP_PRELOGIN_COOKIE=$((
+        GP_PRELOGIN_HTML=$(
             osascript <<'END'
-                tell application "Safari"
-                    activate
-                    set my_html to source of document 1
+                activate application "Safari"
+                display dialog "If needed, manually authenticate and press OK to continue." buttons {"OK"} default button "OK"
+                tell application "Safari" 
+                    set my_html to source of document 1 
                     close current tab of front window without saving
                 end tell
                 return my_html
                 end run
-            END
-        ) | ggrep -oE 'cookie>(.*)</prelogin' | cut -c8- | rev | cut -c11- | rev)
-
-        read -p "Press 'enter' to confirm that your browser displayed a 'Login Successful' message."
+END
+        ) 
+        GP_PRELOGIN_COOKIE=$(parse_prelogin_html "${GP_PRELOGIN_HTML}")
     fi
 
     echo -e "When asked, enter your sudo password.\n"
