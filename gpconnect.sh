@@ -89,6 +89,7 @@ END
 function get_gateways() {
     # TODO: submit request to getconfig.esp and parse the response 
     # to extract the gateway based on user preference
+    echo "no-op" > /dev/null
 }
 
 function connect() {
