@@ -38,6 +38,7 @@ function read_config() {
 
     if [[ -z "${GP_SERVER}" || -z "${GP_GATEWAY}" || -z "${FAVORITE_GATEWAY}" ]]; then
         echo -e "Please check that GP_SERVER, GP_GATEWAY and FAVORITE_GATEWAY are properly configured in ${CONF}".
+        exit 1
     fi;
 }
 
