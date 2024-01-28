@@ -4,6 +4,7 @@ GP_SERVER=
 GP_GATEWAY=
 # Valid values from openconnect: linux, linux-64, win, mac-intel, android, apple-ios.
 GP_OS=
+FAVORITE_GATEWAY=
 
 VPNC_SCRIPT=
 HIP_REPORT=

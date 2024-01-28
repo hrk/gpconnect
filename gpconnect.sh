@@ -36,9 +36,58 @@ function read_config() {
         source "${CONF}";
     fi;
 
-    if [[ -z "${GP_SERVER}" || -z "${GP_GATEWAY}" ]]; then
-        echo -e "Please check that both GP_SERVER and GP_GATEWAY are properly configured in ${CONF}".
+    if [[ -z "${GP_SERVER}" || -z "${GP_GATEWAY}" || -z "${FAVORITE_GATEWAY}" ]]; then
+        echo -e "Please check that GP_SERVER, GP_GATEWAY and FAVORITE_GATEWAY are properly configured in ${CONF}".
     fi;
+}
+
+function get_prelogin_cookie () {
+
+    RESPONSE="${1}"
+    GP_PRELOGIN_MODE="${2}"
+
+    if [[ -z "${RESPONSE}" ]]; then
+            echo "Prelogin failed. Please check your configuration before trying again." >$(tty)
+            exit 1
+    fi;
+
+    LOGIN=$(echo "${RESPONSE}" | grep -oE 'via (.*SAMLRequest.*)' | cut -c 4- | xargs)
+
+    if [[ ${GP_PRELOGIN_MODE} = "manual" ]]; then
+        echo -e "Connect to the following URL:\n${LOGIN}\nand, when the authentication is complete, copy the resulting HTML." >$(tty)
+        read -p "Paste full HTML or pre-login cookie: " GP_PRELOGIN_COOKIE
+        
+        if [[ "${GP_PRELOGIN_COOKIE}" =~ "cookie>" ]]; then
+            GP_PRELOGIN_COOKIE=$(parse_prelogin_html ${GP_PRELOGIN_COOKIE})
+            echo -e "Detected HTML fragment, Cookie value: ${GP_PRELOGIN_COOKIE}" >$(tty)
+        fi;
+    elif [[ ${GP_PRELOGIN_MODE} = "automatic" ]]; then
+        echo -e "A new browser window will now be opened automatically. If you don't have an open session you will have to authenticate manually: once you're done, please return to this window." >$(tty)
+        read -p "Press 'enter' to continue."
+        open -u ${LOGIN}
+        
+        GP_PRELOGIN_HTML=$(
+            osascript <<'END'
+                activate application "Safari"
+                display dialog "Once authenticated, the webpage should show 'Login Successful'. You may then press OK to continue." buttons {"OK"} default button "OK"
+                tell application "Safari" 
+                    set my_html to source of document 1 
+                    close current tab of front window without saving
+                end tell
+                return my_html
+                end run
+END
+        ) 
+        GP_PRELOGIN_COOKIE=$(parse_prelogin_html "${GP_PRELOGIN_HTML}")
+    fi
+
+    echo ${GP_PRELOGIN_COOKIE}
+}
+
+
+function get_gateways() {
+    # TODO: submit request to getconfig.esp and parse the response 
+    # to extract the gateway based on user preference
 }
 
 function connect() {
@@ -66,46 +115,30 @@ function connect() {
     # ... then make sure it's lowercase:
     GP_USER=${GP_USER,,}
 
-    RESPONSE=$(openconnect --protocol=gp "${GP_SERVER}" --user="${GP_USER}" 2>/dev/null)
+    # TODO: implement a try/catch for servers requiring prelogin on GW instead of portal
 
-    if [[ -z "${RESPONSE}" ]]; then
-            echo "Prelogin failed. Please check your configuration before trying again."
-            exit 1
-    fi;
+    #PORTAL_RESPONSE=$(openconnect -vvv --dump-http-traffic --protocol=gp "${GP_SERVER}" --user="${GP_USER}" 2>/dev/null)
 
-    LOGIN=$(echo "${RESPONSE}" | grep -oE 'via (.*SAMLRequest.*)' | cut -c 4- | xargs)
+    #PORTAL_PRELOGIN_COOKIE=$(get_prelogin_cookie "${PORTAL_RESPONSE}" "${GP_PRELOGIN_MODE}")
 
-    if [[ ${GP_PRELOGIN_MODE} = "manual" ]]; then
-        echo -e "Connect to the following URL:\n${LOGIN}\nand, when the authentication is complete, copy the resulting HTML."
-        read -p "Paste full HTML or pre-login cookie: " GP_PRELOGIN_COOKIE
-        
-        if [[ "${GP_PRELOGIN_COOKIE}" =~ "cookie>" ]]; then
-            GP_PRELOGIN_COOKIE=$(parse_prelogin_html ${GP_PRELOGIN_COOKIE})
-            echo -e "Detected HTML fragment, Cookie value: ${GP_PRELOGIN_COOKIE}"
-        fi;
-    elif [[ ${GP_PRELOGIN_MODE} = "automatic" ]]; then
-        echo -e "A new browser window will now be opened automatically. If you don't have an open session you will have to authenticate manually: once you're done, please return to this window."
-        read -p "Press 'enter' to continue."
-        open -u ${LOGIN}
-        
-        GP_PRELOGIN_HTML=$(
-            osascript <<'END'
-                activate application "Safari"
-                display dialog "If needed, manually authenticate and press OK to continue." buttons {"OK"} default button "OK"
-                tell application "Safari" 
-                    set my_html to source of document 1 
-                    close current tab of front window without saving
-                end tell
-                return my_html
-                end run
-END
-        ) 
-        GP_PRELOGIN_COOKIE=$(parse_prelogin_html "${GP_PRELOGIN_HTML}")
-    fi
+    # Perform prelogin on gateway instead of portal
+    GW_RESPONSE=$(openconnect --protocol=gp ${FAVORITE_GATEWAY} --user="${GP_USER}" 2>/dev/null)
+    GW_PRELOGIN_COOKIE=$(get_prelogin_cookie "${GW_RESPONSE}" "${GP_PRELOGIN_MODE}")
 
     echo -e "When asked, enter your sudo password.\n"
 
-    echo "${GP_PRELOGIN_COOKIE}" | sudo openconnect --passwd-on-stdin --background --quiet "${GP_SERVER}" --protocol=gp --user="${GP_USER}" --os="${GP_OS}" --authgroup="${GP_GATEWAY}" --usergroup=portal:prelogin-cookie "${GP_WRAPPER}" "${GP_SCRIPT}"
+    # Login on gateway
+    echo "${GW_PRELOGIN_COOKIE}" | sudo openconnect \
+    --passwd-on-stdin \
+    --background \
+    --protocol=gp \
+    --user="${GP_USER}" \
+    --os="${GP_OS}" \
+    --authgroup="${GP_GATEWAY}" \
+    --usergroup=gateway:prelogin-cookie \
+    "${FAVORITE_GATEWAY}" \
+    "${GP_WRAPPER}" \
+    "${GP_SCRIPT}"
 }
 
 function disconnect () {
