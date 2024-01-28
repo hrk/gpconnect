@@ -36,8 +36,8 @@ function read_config() {
         source "${CONF}";
     fi;
 
-    if [[ -z "${GP_SERVER}" || -z "${GP_GATEWAY}" || -z "${FAVORITE_GATEWAY}" ]]; then
-        echo -e "Please check that GP_SERVER, GP_GATEWAY and FAVORITE_GATEWAY are properly configured in ${CONF}".
+    if [[ -z "${GP_SERVER}" || -z "${GP_DEFAULT_REGION}" || -z "${GP_DEFAULT_GW}" ]]; then
+        echo -e "Please check that GP_SERVER, GP_DEFAULT_REGION and GP_DEFAULT_GW are properly configured in ${CONF}".
         exit 1
     fi;
 }
@@ -87,9 +87,37 @@ END
 
 
 function get_gateways() {
-    # TODO: submit request to getconfig.esp and parse the response
-    # to extract the gateway based on user preference
-    echo "no-op" > /dev/null
+
+    GATEWAYS=$(echo -e "${1}" |  grep -Eo '^.*\((.*gw\.gpcloudservice\.com)\).*$')
+    
+    GW_ARR=()
+    IFS=$'\n'
+    
+    while read -r line; do
+      GW_ARR+=(${line})
+    done <<< "$GATEWAYS"
+
+    echo -e "The portal offers the following gateways for connection:" >$(tty)
+
+    GW_IDX=1
+    for GW in "${GW_ARR[@]}"; do
+      echo "$GW_IDX) $GW" >$(tty)
+      ((GW_IDX++))
+    done
+
+    while :
+    do
+        read -p "Enter the item number corresponding to the gateway of your choice: " USER_CHOICE
+
+        if [[ $USER_CHOICE =~ ^[0-9]+$ ]] && [[ $USER_CHOICE -ge 1 ]] && [[ $USER_CHOICE -le $(($GW_IDX - 1)) ]]
+        then
+            echo "${GW_ARR[$(($USER_CHOICE-1))]}"
+            break
+        else
+            echo "Invalid choice, please try again."
+            continue
+        fi
+    done
 }
 
 function connect() {
@@ -117,34 +145,64 @@ function connect() {
     # ... then make sure it's lowercase:
     GP_USER=${GP_USER,,}
 
-    # TODO: implement a try/catch for servers requiring prelogin on GW instead of portal
+    echo -e "Will now perform a portal prelogin attempt.\n"
 
-    #PORTAL_RESPONSE=$(openconnect -vvv --dump-http-traffic --protocol=gp "${GP_SERVER}" --user="${GP_USER}" 2>/dev/null)
+    PORTAL_RESPONSE=$(openconnect --protocol=gp "${GP_SERVER}" --user="${GP_USER}" 2>/dev/null)
+    PORTAL_PRELOGIN_COOKIE=$(get_prelogin_cookie "${PORTAL_RESPONSE}" "${GP_PRELOGIN_MODE}")
 
-    #PORTAL_PRELOGIN_COOKIE=$(get_prelogin_cookie "${PORTAL_RESPONSE}" "${GP_PRELOGIN_MODE}")
+    echo -e "Will now perform a portal login attempt. When asked, enter your sudo password.\n"
 
-    # Perform prelogin on gateway instead of portal
-    GW_RESPONSE=$(openconnect --protocol=gp ${FAVORITE_GATEWAY} --user="${GP_USER}" 2>/dev/null)
-    GW_PRELOGIN_COOKIE=$(get_prelogin_cookie "${GW_RESPONSE}" "${GP_PRELOGIN_MODE}")
-
-    echo -e "When asked, enter your sudo password.\n"
-
-    # Login on gateway
-    echo "${GW_PRELOGIN_COOKIE}" | sudo openconnect \
+    # Login on portal
+    PORTAL_LOGIN=$(echo "${PORTAL_PRELOGIN_COOKIE}" | sudo openconnect \
+    --dump-http-traffic \
     --passwd-on-stdin \
     --background \
     --protocol=gp \
     --user="${GP_USER}" \
     --os="${GP_OS}" \
-    --authgroup="${GP_GATEWAY}" \
-    --usergroup=gateway:prelogin-cookie \
-    "${FAVORITE_GATEWAY}" \
+    --authgroup="${GP_DEFAULT_REGION}" \
+    --usergroup=portal:prelogin-cookie \
+    "${GP_SERVER}" \
     "${GP_WRAPPER}" \
-    "${GP_SCRIPT}"
+    "${GP_SCRIPT}")
+
+
+    if [[ "${PORTAL_LOGIN}" =~ "Login fails" ]]; then
+        
+        echo -e "Portal login not allowed. Follow the procedure to choose a gateway to login.\n"
+        
+        GATEWAY=$(get_gateways "${PORTAL_LOGIN}")
+
+        echo -e "${GATEWAY} will be used to perform login.\n"
+
+        AUTHGROUP="$(echo ${GATEWAY} | grep -Eo '^(.*) ' | xargs)"
+        GATEWAY_ADDRESS="$(echo ${GATEWAY} | grep -Eo '\((.*)\)' | cut -c2- | rev | cut -c2- | rev)"
+
+        # Perform prelogin on gateway instead of portal
+        GW_RESPONSE=$(openconnect --protocol=gp ${GP_DEFAULT_GW} --user="${GP_USER}" 2>/dev/null)
+        GW_PRELOGIN_COOKIE=$(get_prelogin_cookie "${GW_RESPONSE}" "${GP_PRELOGIN_MODE}")
+
+        # Login on gateway
+        echo "${GW_PRELOGIN_COOKIE}" | sudo openconnect \
+        --passwd-on-stdin \
+        --background \
+        --protocol=gp \
+        --user="${GP_USER}" \
+        --os="${GP_OS}" \
+        --authgroup="${AUTHGROUP}" \
+        --usergroup=gateway:prelogin-cookie \
+        "${GATEWAY_ADDRESS}" \
+        "${GP_WRAPPER}" \
+        "${GP_SCRIPT}"
+    fi
+
+    echo -e "Login succeeded."
+
+    exit 0
 }
 
 function disconnect () {
-    sudo pkill -SIGINT -f "${GP_SERVER}" && echo "Disconnected" || echo "Could not terminate the tunnel."
+    sudo pkill -SIGINT -f "${GP_USER}" && echo "Disconnected" || echo "Could not terminate the tunnel."
 }
 
 read_config
