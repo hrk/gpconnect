@@ -57,7 +57,7 @@ function get_prelogin_cookie () {
     if [[ ${GP_PRELOGIN_MODE} = "manual" ]]; then
         echo -e "Connect to the following URL:\n${LOGIN}\nand, when the authentication is complete, copy the resulting HTML." >$(tty)
         read -p "Paste full HTML or pre-login cookie: " GP_PRELOGIN_COOKIE
-        
+
         if [[ "${GP_PRELOGIN_COOKIE}" =~ "cookie>" ]]; then
             GP_PRELOGIN_COOKIE=$(parse_prelogin_html ${GP_PRELOGIN_COOKIE})
             echo -e "Detected HTML fragment, Cookie value: ${GP_PRELOGIN_COOKIE}" >$(tty)
@@ -66,19 +66,19 @@ function get_prelogin_cookie () {
         echo -e "A new browser window will now be opened automatically. If you don't have an open session you will have to authenticate manually: once you're done, please return to this window." >$(tty)
         read -p "Press 'enter' to continue."
         open -u ${LOGIN}
-        
+
         GP_PRELOGIN_HTML=$(
             osascript <<'END'
                 activate application "Safari"
                 display dialog "Once authenticated, the webpage should show 'Login Successful'. You may then press OK to continue." buttons {"OK"} default button "OK"
-                tell application "Safari" 
-                    set my_html to source of document 1 
+                tell application "Safari"
+                    set my_html to source of document 1
                     close current tab of front window without saving
                 end tell
                 return my_html
                 end run
 END
-        ) 
+        )
         GP_PRELOGIN_COOKIE=$(parse_prelogin_html "${GP_PRELOGIN_HTML}")
     fi
 
@@ -87,7 +87,7 @@ END
 
 
 function get_gateways() {
-    # TODO: submit request to getconfig.esp and parse the response 
+    # TODO: submit request to getconfig.esp and parse the response
     # to extract the gateway based on user preference
     echo "no-op" > /dev/null
 }
@@ -157,7 +157,7 @@ if [ "$action" = "connect" ]; then
     fi
 elif  [ "$action" = "disconnect" ]; then
     disconnect
-else 
+else
     echo "Action not implemented"
     exit 1;
 fi
